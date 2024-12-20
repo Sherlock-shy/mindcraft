@@ -5,16 +5,7 @@ import { getSkillDocs } from './library/index.js';
 import { stringifyTurns } from '../utils/text.js';
 import { getCommand } from './commands/index.js';
 
-import { Gemini } from '../models/gemini.js';
-import { GPT } from '../models/gpt.js';
-import { Claude } from '../models/claude.js';
-import { ReplicateAPI } from '../models/replicate.js';
-import { Local } from '../models/local.js';
-import { Novita } from '../models/novita.js';
-import { GroqCloudAPI } from '../models/groq.js';
-import { HuggingFace } from '../models/huggingface.js';
-import { Qwen } from "../models/qwen.js";
-import { Grok } from "../models/grok.js";
+import { Yui } from "../models/yui.js";
 
 export class Prompter {
     constructor(agent, fp) {
@@ -31,94 +22,30 @@ export class Prompter {
         this.coding_examples = null;
         
         let name = this.profile.name;
-        let chat = this.profile.model;
+        let chat = this.profile.model || 'Yui';
         this.cooldown = this.profile.cooldown ? this.profile.cooldown : 0;
         this.last_prompt_time = 0;
         this.awaiting_coding = false;
 
         // try to get "max_tokens" parameter, else null
-        let max_tokens = null;
-        if (this.profile.max_tokens)
-            max_tokens = this.profile.max_tokens;
+        let max_tokens = this.profile.max_tokens || 4096;
         if (typeof chat === 'string' || chat instanceof String) {
-            chat = {model: chat};
-            if (chat.model.includes('gemini'))
-                chat.api = 'google';
-            else if (chat.model.includes('gpt') || chat.model.includes('o1'))
-                chat.api = 'openai';
-            else if (chat.model.includes('claude'))
-                chat.api = 'anthropic';
-            else if (chat.model.includes('huggingface/'))
-                chat.api = "huggingface";
-            else if (chat.model.includes('meta/') || chat.model.includes('mistralai/') || chat.model.includes('replicate/'))
-                chat.api = 'replicate';
-            else if (chat.model.includes("groq/") || chat.model.includes("groqcloud/"))
-                chat.api = 'groq';
-            else if (chat.model.includes('novita/'))
-                chat.api = 'novita';
-            else if (chat.model.includes('qwen'))
-                chat.api = 'qwen';
-            else if (chat.model.includes('grok'))
-                chat.api = 'xai';
-            else
-                chat.api = 'ollama';
+            chat = { model: chat };
         }
 
+        chat.api = 'yui';
+        chat.url = 'http://127.0.0.1:8000';
+        
         console.log('Using chat settings:', chat);
-
-        if (chat.api === 'google')
-            this.chat_model = new Gemini(chat.model, chat.url);
-        else if (chat.api === 'openai')
-            this.chat_model = new GPT(chat.model, chat.url);
-        else if (chat.api === 'anthropic')
-            this.chat_model = new Claude(chat.model, chat.url);
-        else if (chat.api === 'replicate')
-            this.chat_model = new ReplicateAPI(chat.model, chat.url);
-        else if (chat.api === 'ollama')
-            this.chat_model = new Local(chat.model, chat.url);
-        else if (chat.api === 'groq') {
-            this.chat_model = new GroqCloudAPI(chat.model.replace('groq/', '').replace('groqcloud/', ''), chat.url, max_tokens ? max_tokens : 8192);
-        }
-        else if (chat.api === 'huggingface')
-            this.chat_model = new HuggingFace(chat.model, chat.url);
-        else if (chat.api === 'novita')
-            this.chat_model = new Novita(chat.model.replace('novita/', ''), chat.url);
-        else if (chat.api === 'qwen')
-            this.chat_model = new Qwen(chat.model, chat.url);
-        else if (chat.api === 'xai')
-            this.chat_model = new Grok(chat.model, chat.url);
-        else
-            throw new Error('Unknown API:', api);
-
-        let embedding = this.profile.embedding;
-        if (embedding === undefined) {
-            if (chat.api !== 'ollama')
-                embedding = {api: chat.api};
-            else
-                embedding = {api: 'none'};
-        }
-        else if (typeof embedding === 'string' || embedding instanceof String)
-            embedding = {api: embedding};
-
+        
+        this.chat_model = new Yui(chat.model, chat.url);
+        
+        let embedding = { api: 'yui', model: chat.model, url: chat.url }; // Enforce using Yui embedding
         console.log('Using embedding settings:', embedding);
 
         try {
-            if (embedding.api === 'google')
-                this.embedding_model = new Gemini(embedding.model, embedding.url);
-            else if (embedding.api === 'openai')
-                this.embedding_model = new GPT(embedding.model, embedding.url);
-            else if (embedding.api === 'replicate')
-                this.embedding_model = new ReplicateAPI(embedding.model, embedding.url);
-            else if (embedding.api === 'ollama')
-                this.embedding_model = new Local(embedding.model, embedding.url);
-            else if (embedding.api === 'qwen')
-                this.embedding_model = new Qwen(embedding.model, embedding.url);
-            else {
-                this.embedding_model = null;
-                console.log('Unknown embedding: ', embedding ? embedding.api : '[NOT SPECIFIED]', '. Using word overlap.');
-            }
-        }
-        catch (err) {
+            this.embedding_model = new Yui(embedding.model, embedding.url);
+        } catch (err) {
             console.log('Warning: Failed to initialize embedding model:', err.message);
             console.log('Continuing anyway, using word overlap instead.');
             this.embedding_model = null;
